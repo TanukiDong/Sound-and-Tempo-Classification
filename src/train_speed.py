@@ -450,22 +450,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train SVM speed model")
 
     # Data file
-    # Default: data/fbank_speed.train.joblib
+    # Default: data/speed.train.joblib
     parser.add_argument(
         "data_file",
         type=Path,
         nargs="?",
-        default=Path("data/fbank_speed.train.joblib"),
+        default=Path("data/speed.train.joblib"),
         help="Path to training data file (joblib format)",
     )
 
     # Model output file
-    # Default: models/mymodel_fbank/model.speed.joblib
+    # Default: models/model.speed.joblib
     parser.add_argument(
         "model_file",
         type=Path,
         nargs="?",
-        default=Path("models/mymodel_fbank/model.speed.joblib"),
+        default=Path("models/model.speed.joblib"),
         help="Path to save trained model (joblib format)",
     )
 

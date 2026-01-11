@@ -576,22 +576,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train SVM tempo model")
 
     # Data file
-    # Default: data/fbank_tempo.train.joblib
+    # Default: data/tempo.train.joblib
     parser.add_argument(
         "data_file",
         type=Path,
         nargs="?",
-        default=Path("data/fbank_tempo.train.joblib"),
+        default=Path("data/tempo.train.joblib"),
         help="Path to tempo training data file (joblib format)",
     )
 
     # Model output file
-    # Default: models/mymodel_fbank/model.tempo.joblib
+    # Default: models/model.tempo.joblib
     parser.add_argument(
         "model_file",
         type=Path,
         nargs="?",
-        default=Path("models/mymodel_fbank/model.tempo.joblib"),
+        default=Path("models/model.tempo.joblib"),
         help="Path to save trained tempo model (joblib format)",
     )
 
