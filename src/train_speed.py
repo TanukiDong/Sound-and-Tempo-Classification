@@ -69,6 +69,7 @@ import numpy as np
 import argparse
 import joblib
 import time
+import yaml
 
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler, MinMaxScaler, RobustScaler
@@ -77,34 +78,18 @@ from sklearn.svm import SVC
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingGridSearchCV
 
-# Random seed
-SEED = 42
+BASE_DIR = Path(__file__).resolve().parent.parent
+CONFIG_PATH = BASE_DIR / "config" / "config.speed.yaml"
+with open(CONFIG_PATH,"r") as f:
+    cfg = yaml.safe_load(f)
 
-# Frequency channels of filterbank features
-N_CHANNELS = 64
-
-# Select Scaler
-# 1. standard : StandardScaler
-# 2. minmax   : MinMaxScaler
-# 3. robust   : RobustScaler
-SCALER = "standard"
-
-# Select hyperparameter search space
-# 1. linear   : Linear kernel only
-# 2. rbf      : RBF kernel only
-# 3. both     : Both linear and RBF kernels
-SEARCH_SPACE = "both"
-
-# Include PCA in the pipeline
-INCLUDE_PCA = False
-
-# Select data augmentation mode
-# 1. none       : No data augmentation
-# 2. noise      : Noise only
-# 3. gain       : Gain only
-# 4. noise_gain : Both noise and gain
-# 5. mask       : Masking only
-AUGMENT = "none"
+SEED = cfg["seed"]
+N_CHANNELS = cfg["features"]["n_channels"]
+N_FRAMES = cfg["features"]["n_frames"]
+SCALER = cfg["scaler"]
+SEARCH_SPACE = cfg["search_space"]
+INCLUDE_PCA = cfg["include_pca"]
+AUGMENT = cfg["augmentation"]
 
 def augment_data(X: np.ndarray, y: np.ndarray, mode: str) -> tuple[np.ndarray, np.ndarray]:
     """

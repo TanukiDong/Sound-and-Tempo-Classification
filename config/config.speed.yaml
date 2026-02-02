@@ -1,0 +1,36 @@
+# Random seed
+seed : 42
+
+features:
+  n_channels: 64  # Frequency channels of filterbank features
+  n_frames: 101   # Number of frames in each sample
+
+# Select Scaler
+# 1. standard : StandardScaler
+# 2. minmax   : MinMaxScaler
+# 3. robust   : RobustScaler
+scaler: standard
+
+# Select hyperparameter search space
+# 1. linear   : Linear kernel only
+# 2. rbf      : RBF kernel only
+# 3. both     : Both linear and RBF kernels
+search_space: both
+
+# Include PCA in the pipeline
+include_pca: false
+
+# Select data augmentation technique
+# 1. none       : No data augmentation
+# 2. noise      : Noise only
+# 3. gain       : Gain only
+# 4. noise_gain : Both noise and gain
+# 5. mask       : Masking only
+augmentation: none
+
+# Select weighting strategy for the VotingClassifier
+# 1. equal      : Equal weights
+# 2. accuracy   : Weights based on CV accuracy
+# 3. fullband   : Full band gets higher weight
+# 4. rank       : Emphasize/penalize according to rank
+voting_weight: accuracy
