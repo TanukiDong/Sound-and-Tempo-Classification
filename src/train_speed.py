@@ -36,32 +36,32 @@ To train the model, run:
 
     Explicit paths:
 
-        python src/mymodel_fbank/train_speed.py \
+        python src/train_speed.py \
             data/fbank_speed.train.joblib \
-            models/mymodel_fbank/model.speed.joblib
+            models/model.speed.joblib
 
-        uv run src/mymodel_fbank/train_speed.py \
+        uv run src/train_speed.py \
             data/fbank_speed.train.joblib \
-            models/mymodel_fbank/model.speed.joblib
+            models/model.speed.joblib
 
     Using default paths:
 
-        python src/mymodel_fbank/train_speed.py
+        python src/train_speed.py
 
-        uv run src/mymodel_fbank/train_speed.py
+        uv run src/train_speed.py
 
 
 To evaluate the trained model, run:
 
         python src/evaluate.py \
-            src/mymodel_fbank \
-            models/mymodel_fbank/model.speed.joblib \
-            data/fbank_speed.test1.joblib 
+            src \
+            models/model.speed.joblib \
+            data/speed.test.joblib
 
         uv run src/evaluate.py \
-            src/mymodel_fbank \
-            models/mymodel_fbank/model.speed.joblib \
-            data/fbank_speed.test1.joblib
+            src \
+            models/model.speed.joblib \
+            data/speed.test.joblib
 """
 
 from pathlib import Path

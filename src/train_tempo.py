@@ -43,32 +43,32 @@ To train the model, run:
 
     Explicit paths:
 
-        python src/mymodel_fbank/train_tempo.py \
-            data/fbank_tempo.train.joblib \
-            models/mymodel_fbank/model.tempo.joblib
+        python src/train_tempo.py \
+            data/tempo.train.joblib \
+            models/model.tempo.joblib
 
-        uv run src/mymodel_fbank/train_tempo.py \
-            data/fbank_tempo.train.joblib \
-            models/mymodel_fbank/model.tempo.joblib
+        uv run src/train_tempo.py \
+            data/tempo.train.joblib \
+            models/model.tempo.joblib
 
     Using default paths:
 
-        python src/mymodel_fbank/train_tempo.py
+        python src/train_tempo.py
 
-        uv run src/mymodel_fbank/train_tempo.py
+        uv run src/train_tempo.py
 
 
 To evaluate the trained model, run:
 
         python src/evaluate.py \
-            src/mymodel_fbank \
-            models/mymodel_fbank/model.tempo.joblib \
-            data/fbank_tempo.test1.joblib 
+            src \
+            models/model.tempo.joblib \
+            data/tempo.test.joblib 
 
         uv run src/evaluate.py \
-            src/mymodel_fbank \
-            models/mymodel_fbank/model.tempo.joblib \
-            data/fbank_tempo.test1.joblib
+            src \
+            models/model.tempo.joblib \
+            data/tempo.test.joblib
 """
 
 from pathlib import Path
