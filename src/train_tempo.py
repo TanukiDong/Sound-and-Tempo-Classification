@@ -77,6 +77,7 @@ import argparse
 import joblib
 import time
 import yaml
+import logging
 
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
@@ -86,6 +87,12 @@ from sklearn.svm import SVC
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingGridSearchCV
 from sklearn.ensemble import VotingClassifier
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "config" / "config.tempo.yaml"
@@ -444,8 +451,7 @@ def train(data_file: Path, model_file: Path) -> None:
     select_weight     : Function to calculate weights for VotingClassifier.
     """
 
-    # Debug message
-    print("\033[94mStarting training\033[0m")
+    logger.info("Starting training")
 
     # Create directory if it doesn't exist
     if not model_file.parent.exists():
@@ -479,7 +485,8 @@ def train(data_file: Path, model_file: Path) -> None:
     # Train one model per band, total 5 models
     time_start = time.time()
     for idx, (start_ch, end_ch) in enumerate(bands, start=1):
-        print(f"Model {idx}/5 : channels {start_ch}-{end_ch - 1}")
+
+        logger.info("Training model %d/5 | channels %d–%d", idx, start_ch, end_ch - 1)
 
         # Create pipeline
         pipeline = create_pipeline(start_ch, end_ch)
@@ -505,9 +512,9 @@ def train(data_file: Path, model_file: Path) -> None:
         scores.append(grid_search.best_score_)
 
         # Report best hyperparameters
-        print(f"Best parameters: {grid_search.best_params_}")
-        print(f"Best CV accuracy: {grid_search.best_score_}")
-        print(f"Training time: {time_end_1 - time_start_1:.2f} seconds")
+        logger.info(f"Best parameters: {grid_search.best_params_}")
+        logger.info(f"Best CV accuracy: {grid_search.best_score_}")
+        logger.info(f"Training time: {time_end_1 - time_start_1:.2f} seconds")
 
     # Convert to numpy array
     scores = np.array(scores, dtype=float)
@@ -516,7 +523,7 @@ def train(data_file: Path, model_file: Path) -> None:
     weights = select_weight(scores, WEIGHT)
 
     # Debug message
-    print(f"Normalised weights for VotingClassifier: {weights}")
+    logger.info(f"Normalised weights for VotingClassifier: {weights}")
 
     # Prepare models for the VotingClassifier
     models = [
@@ -531,22 +538,22 @@ def train(data_file: Path, model_file: Path) -> None:
         n_jobs=-1,
     )
 
-    print("\033[94mTraining soft voter\033[0m")
+    logger.info("Training soft voter")
     ensemble_start = time.time()
     voter.fit(X, y)
     ensemble_end = time.time()
 
-    print(f"Voter training time: {ensemble_end - ensemble_start:.2f} seconds")
+    logger.info(f"Voter training time: {ensemble_end - ensemble_start:.2f} seconds")
 
     time_end = time.time()
-    print(f"Total training time: {time_end - time_start:.2f} seconds")
+    logger.info(f"Total training time: {time_end - time_start:.2f} seconds")
 
     joblib.dump(voter, model_file)
-    print(f"Saved tempo model to: {model_file}")
+    logger.info(f"Saved tempo model to: {model_file}")
 
-    # Print model size
+    # Log model size
     model_size = model_file.stat().st_size / (1024 * 1024)
-    print(f"Model size: {model_size:.2f} MB")
+    logger.info(f"Model size: {model_size:.2f} MB")
 
 
 if __name__ == "__main__":

@@ -70,6 +70,7 @@ import argparse
 import joblib
 import time
 import yaml
+import logging
 
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler, MinMaxScaler, RobustScaler
@@ -77,6 +78,12 @@ from sklearn.decomposition import PCA
 from sklearn.svm import SVC
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingGridSearchCV
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "config" / "config.speed.yaml"
@@ -111,6 +118,7 @@ def augment_data(X: np.ndarray, y: np.ndarray, mode: str) -> tuple[np.ndarray, n
         - gain       : Random gain of ±10%
         - noise_gain : Both noise and gain
         - mask       : Time and frequency masking with maximum of 10% of features
+
     Returns
     -------
     X_aug : np.ndarray, shape (n_samples, n_features) or (2 * n_samples, n_features)
@@ -374,8 +382,7 @@ def train(data_file: Path, model_file: Path) -> None:
     create_pipeline   : Function to create the SVM pipeline.
     """
 
-    # Debug message
-    print("\033[94mStarting training\033[0m")
+    logger.info("Starting training")
 
     # Create directory if it doesn't exist
     if not model_file.parent.exists():
@@ -415,18 +422,18 @@ def train(data_file: Path, model_file: Path) -> None:
     
 
     # Report best hyperparameters
-    print(f"Best parameters: {grid_search.best_params_}")
-    print(f"Best CV accuracy: {grid_search.best_score_}")
-    print(f"Training time: {end_time - start_time:.2f} seconds")
+    logger.info(f"Best parameters: {grid_search.best_params_}")
+    logger.info(f"Best CV accuracy: {grid_search.best_score_}")
+    logger.info(f"Training time: {end_time - start_time:.2f} seconds")
 
     # Save the best model
     best_model = grid_search.best_estimator_
     joblib.dump(best_model, model_file)
-    print(f"Saved speed model to: {model_file}")
+    logger.info(f"Saved speed model to: {model_file}")
 
-    # Print model size
+    # Log model size
     model_size = model_file.stat().st_size / (1024 * 1024)
-    print(f"Model size: {model_size:.2f} MB")
+    logger.info(f"Model size: {model_size:.2f} MB")
 
 
 if __name__ == "__main__":
