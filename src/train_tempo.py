@@ -23,7 +23,8 @@ The training procedure consists of the following steps:
     5. Combine the 5 optimised classifiers using a soft voting classifier.
     6. Save the trained ensemble model as a joblib file.
 
-Usage:
+Usage
+-----
 
     Command to train the tempo model:
 
@@ -37,7 +38,8 @@ Usage:
 
         uv run src/evaluate.py <SRC_DIR> <MODEL_FILE_NAME> <TEST_DATA_FILE_NAME> 
 
-Examples:
+Examples
+--------
 
 To train the model, run:
 
@@ -71,22 +73,22 @@ To evaluate the trained model, run:
             data/tempo.test.joblib
 """
 
-from pathlib import Path
-import numpy as np
 import argparse
-import joblib
-import time
-import yaml
 import logging
+import time
+from pathlib import Path
 
-from sklearn.pipeline import Pipeline
+import joblib
+import numpy as np
+import yaml
 from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.decomposition import PCA
-from sklearn.svm import SVC
+from sklearn.ensemble import VotingClassifier
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingGridSearchCV
-from sklearn.ensemble import VotingClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+from sklearn.svm import SVC
 
 logging.basicConfig(
     level=logging.INFO,
@@ -113,6 +115,7 @@ def augment_data(X: np.ndarray, y: np.ndarray, mode: str) -> tuple[np.ndarray, n
 
     Parameters
     ----------
+
     X : np.ndarray, shape (n_samples, n_features)
         2D numpy array of flattened filterbank features
     
@@ -127,8 +130,10 @@ def augment_data(X: np.ndarray, y: np.ndarray, mode: str) -> tuple[np.ndarray, n
         - gain       : Random gain of ±10%
         - noise_gain : Both noise and gain
         - mask       : Time and frequency masking with maximum of 10% of features
+    
     Returns
     -------
+
     X_aug : np.ndarray, shape (n_samples, n_features) or (2 * n_samples, n_features)
         Augmented filterbank feature matrix.
     
@@ -137,6 +142,7 @@ def augment_data(X: np.ndarray, y: np.ndarray, mode: str) -> tuple[np.ndarray, n
 
     Raises
     ------
+
     ValueError
         If "mode" is not a valid augmentation technique.
     """
@@ -166,13 +172,13 @@ def augment_data(X: np.ndarray, y: np.ndarray, mode: str) -> tuple[np.ndarray, n
             gain = rng.uniform(0.9, 1.1)
             x = x * gain
         
-        if mode in {"noise", "noise_gain"}:
+        elif mode in {"noise", "noise_gain"}:
             # 10% of standard deviation
             noise_std = np.std(x) * 0.1
             noise = rng.normal(0, noise_std, x.shape)
             x = x + noise
 
-        if mode == "mask":
+        else:
             # Time mask
             # 1 ~ 10 = max 10% of 101 frames
             t_range = rng.integers(1, 11)
@@ -203,6 +209,7 @@ def select_scaler(mode: str):
 
     Parameters
     ----------
+
     mode : str
         Scaler type to use.
         One of {"standard", "minmax", "robust"}.
@@ -212,11 +219,13 @@ def select_scaler(mode: str):
 
     Returns
     -------
+
     scaler : object
         Scaler object corresponding to the selected mode.
 
     Raises
     ------
+
     ValueError
         If "mode" is not a valid scaler type.
     """
@@ -225,9 +234,9 @@ def select_scaler(mode: str):
 
     if mode == "standard":
         return StandardScaler()
-    if mode == "minmax":
+    elif mode == "minmax":
         return MinMaxScaler()
-    if mode == "robust":
+    else:
         return RobustScaler()
 
 def select_weight(scores, mode: str) -> list[float]:
@@ -236,6 +245,7 @@ def select_weight(scores, mode: str) -> list[float]:
 
     Parameters
     ----------
+
     scores : np.ndarray, shape (n_classifiers,)
         Cross-validation accuracy scores of each classifier.
 
@@ -249,11 +259,13 @@ def select_weight(scores, mode: str) -> list[float]:
 
     Returns
     -------
+
     weights : List[float]
         Weight list corresponding to the selected strategy.
 
     Raises
     ------
+
     ValueError
         If "mode" is not a valid weighting strategy.
     """
@@ -273,7 +285,7 @@ def select_weight(scores, mode: str) -> list[float]:
         scores[-1] *= 1.5
         weights = scores / sum(scores)
 
-    elif mode == "rank":
+    else:
         # Emphasize with higher weight and penalize with lower weight according to cv accuracy
         order = np.argsort(scores)
         multiplier = np.array([0.8, 0.9, 1.0, 1.1, 1.2])
@@ -294,6 +306,7 @@ def create_pipeline(start_ch: int, end_ch: int) -> Pipeline:
 
     Parameters
     ----------
+
     start_ch : int
         Starting channel index (inclusive) for the band.
 
@@ -302,11 +315,13 @@ def create_pipeline(start_ch: int, end_ch: int) -> Pipeline:
 
     Returns
     -------
+
     pipeline : Pipeline
         Pipeline for tempo classification.
 
     See Also
     --------
+
     select_scaler : Function to select the scaler.
     """
 
@@ -358,20 +373,25 @@ def select_param_grid(mode: str):
 
     Parameters
     ----------
+
     mode : str
         Hyperparameter search space to use.
         One of {"linear", "rbf", "both"}.
 
     Returns
     -------
+
     param_grid : list of dict
         Hyperparameter grid corresponding to the selected mode.
 
     Raises
     ------
+
     ValueError
         If "mode" is not a valid hyperparameter search space.
     """
+    if mode not in {"linear", "rbf", "both"}:
+        raise ValueError(f"""Invalid hyperparameter search space : "{mode}". \n Choose from "linear", "rbf", or "both".""")
 
     if mode == "linear":
         return [
@@ -390,7 +410,7 @@ def select_param_grid(mode: str):
                 "svm__gamma": ["scale", "auto"],
             },
         ]
-    if mode == "both":
+    else:
         return [
             # Linear kernel does not require gamma
             {
@@ -405,8 +425,6 @@ def select_param_grid(mode: str):
                 "svm__gamma": ["scale", "auto"],
             },
         ]
-    else:
-        raise ValueError(f"""Invalid hyperparameter search space selection : "{mode}". \n Choose from "linear", "rbf", or "both".""")
     
 def train(data_file: Path, model_file: Path) -> None:
     """
@@ -425,6 +443,7 @@ def train(data_file: Path, model_file: Path) -> None:
 
     Parameters
     ----------
+
     data_file : pathlib.Path
         Path to the tempo training data joblib file.
         The file must contain a dictionary with keys:
@@ -440,11 +459,13 @@ def train(data_file: Path, model_file: Path) -> None:
 
     Returns
     -------
+
     None
         The trained model is saved to model_file.
 
     See Also
     --------
+
     augment_data      : Function to apply data augmentation to training data.
     select_param_grid : Function to select hyperparameter search space.
     create_pipeline   : Function to create the SVM pipeline.
