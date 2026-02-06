@@ -81,12 +81,14 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.svm import SVC
 
+# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
 
+# Load configuration parameters
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "config" / "config.speed.yaml"
 with open(CONFIG_PATH,"r") as f:
@@ -194,49 +196,6 @@ def augment_data(X: np.ndarray, y: np.ndarray, mode: str) -> tuple[np.ndarray, n
 
     return X_final, y_final
 
-def create_pipeline() -> Pipeline:
-    """
-    Create a pipeline for speed classification.
-
-    The pipeline applies the following steps in order:
-    1. Averaging of filterbank frames
-    2. Feature scaling using the selected scaler
-    3. (Optional) PCA for dimensionality reduction
-    4. SVM classifier
-
-    Returns
-    -------
-
-    pipeline : Pipeline
-        Configured pipeline.
-
-    See Also
-    --------
-
-    average_frames : Function to average filterbank frames.
-    select_scaler  : Function to select the scaler.
-    """
-
-    scaler = select_scaler(SCALER)
-
-    steps = [
-        # 1. Average frames
-        ("average_frames", FunctionTransformer(average_frames, validate=False)),
-        # 2. Scaler
-        ("scaler", scaler),
-    ]
-
-    if INCLUDE_PCA:
-        # 3. PCA
-        steps.append(("pca", PCA(random_state=SEED)))
-    
-    # 4. SVM classifier
-    steps.append(("svm", SVC(random_state=SEED)))
-
-    pipeline = Pipeline(steps)
-
-    return pipeline
-
 def average_frames(X: np.ndarray) -> np.ndarray:
     """
     Reduce the dimensionality of filterbank features to 64-dimensional vector by averaging each features over time.
@@ -244,14 +203,14 @@ def average_frames(X: np.ndarray) -> np.ndarray:
     Parameters
     ----------
 
-    X : np.ndarray, shape (n_samples, n_features) or (n_samples, 64 * time_frames)  
+    X : np.ndarray, shape (n_samples, n_features) or (n_samples, n_channels * time_frames)  
         2D numpy array of flattened filterbank features
         For example, 1 second speech sample with 10ms time resolution (101 time frames) results in (n_samples, 6464)
 
     Returns
     -------
 
-    np.ndarray, shape (n_samples, 64)
+    np.ndarray, shape (n_samples, n_channels)
         2D numpy array of averaged frequency of each filterbank features over time.
     """
 
@@ -296,7 +255,51 @@ def select_scaler(mode: str):
         return MinMaxScaler()
     else:
         return RobustScaler()
+
+def create_pipeline() -> Pipeline:
+    """
+    Create a pipeline for speed classification.
+
+    The pipeline applies the following steps in order:
+    1. Averaging of filterbank frames
+    2. Feature scaling using the selected scaler
+    3. (Optional) PCA for dimensionality reduction
+    4. SVM classifier
+
+    Returns
+    -------
+
+    pipeline : Pipeline
+        Configured pipeline.
+
+    See Also
+    --------
+
+    average_frames : Function to average filterbank frames.
+    select_scaler  : Function to select the scaler.
+    """
+
+    # Select scaler for the pipeline
+    scaler = select_scaler(SCALER)
+
+    steps = [
+        # 1. Average frames
+        ("average_frames", FunctionTransformer(average_frames, validate=False)),
+        # 2. Scaler
+        ("scaler", scaler),
+    ]
+
+    if INCLUDE_PCA:
+        # 3. PCA
+        steps.append(("pca", PCA(random_state=SEED)))
     
+    # 4. SVM classifier
+    steps.append(("svm", SVC(random_state=SEED)))
+
+    pipeline = Pipeline(steps)
+
+    return pipeline
+
 def select_param_grid(mode: str):
     """
     Select hyperparameter grid for the pipeline.
@@ -377,7 +380,7 @@ def train(data_file: Path, model_file: Path) -> None:
     data_file : pathlib.Path
         Path to speed training data joblib file.
         The file must contain a dictionary with keys:
-            "features" : 2D numpy array of shape (n_samples, 64 * time_frames)
+            "features" : 2D numpy array of shape (n_samples, n_channels * time_frames)
                          Each row is a flattened filterbank feature matrix.
 
             "target"   : 1D numpy array of shape (n_samples,)

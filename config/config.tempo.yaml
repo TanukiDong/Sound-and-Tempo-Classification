@@ -30,4 +30,4 @@ augmentation: none
 # 2. accuracy   : Weights based on CV accuracy
 # 3. fullband   : Full band gets higher weight
 # 4. rank       : Emphasize/penalize according to rank
-voting_weight: accuracy
+voting_weight: rank

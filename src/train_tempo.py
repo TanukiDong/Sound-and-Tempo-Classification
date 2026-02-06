@@ -87,15 +87,19 @@ from sklearn.ensemble import VotingClassifier
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingGridSearchCV
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import MinMaxScaler, RobustScaler, StandardScaler
+from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, RobustScaler, StandardScaler
 from sklearn.svm import SVC
 
+from utils import avg_abs_frame_diff
+
+# Set up logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
 )
 logger = logging.getLogger(__name__)
 
+# Load configuration parameters
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_PATH = BASE_DIR / "config" / "config.tempo.yaml"
 with open(CONFIG_PATH,"r") as f:
@@ -294,15 +298,16 @@ def select_weight(scores, mode: str) -> list[float]:
 
     return list(weights)
 
-def create_pipeline(start_ch: int, end_ch: int) -> Pipeline:
+def create_pipeline(start_ch: int, end_ch: int, include_pca: bool) -> Pipeline:
     """
     Create a pipeline for tempo classification.
 
     The pipeline consists of:
     1. Select columns for the specified band
-    2. Feature scaling using the selected scaler
-    3. PCA for dimensionality reduction
-    4. SVM classifier
+    2. Calculate rate of change using average absolute frame-to-frame differences
+    3. Feature scaling using the selected scaler
+    4. PCA for dimensionality reduction (for full band model)
+    5. SVM classifier
 
     Parameters
     ----------
@@ -312,6 +317,10 @@ def create_pipeline(start_ch: int, end_ch: int) -> Pipeline:
 
     end_ch : int
         Ending channel index (exclusive) for the band.
+
+    include_pca : bool
+        Whether to include PCA in the pipeline.
+        Use for full band model.
 
     Returns
     -------
@@ -328,8 +337,7 @@ def create_pipeline(start_ch: int, end_ch: int) -> Pipeline:
     # Column indices for the selected band
     band_cols = np.arange(start_ch * N_FRAMES, end_ch * N_FRAMES)
 
-    # Keep only selected band columns
-    # And drop the rest
+    # Keep only selected band columns and drop the rest
     select_band = ColumnTransformer(
         transformers=[("band", "passthrough", band_cols)],
         remainder="drop",
@@ -339,28 +347,25 @@ def create_pipeline(start_ch: int, end_ch: int) -> Pipeline:
     # Select scaler for the pipeline
     scaler = select_scaler(SCALER)
 
-    # Pipeline
-    pipeline = Pipeline(
-        [
+    steps = [
             # 1. Select columns for the band
             ("band", select_band),
-            # 2. Scaler
+            # 2. Calculate change-rate features
+            ("change_rate", FunctionTransformer(avg_abs_frame_diff, kw_args={"n_frames": N_FRAMES})),
+            # 3. Scaler
             ("scaler", scaler),
-            # 3. PCA
-            ("pca", PCA(random_state=SEED)),
-            # 4. SVM classifier
-            ("svm", SVC(
-                probability=True,
-                random_state=SEED,
-                )
-            ),
-            
         ]
-    )
 
-    return pipeline
+    # 4. PCA on the full band model
+    if include_pca:
+        steps.append(("pca", PCA(random_state=SEED)))
 
-def select_param_grid(mode: str):
+    # 5. SVM classifier
+    steps.append(("svm",SVC(probability=True,random_state=SEED,)))
+    
+    return Pipeline(steps)
+
+def select_param_grid(mode: str, include_pca: bool) -> list[dict]:
     """
     Select hyperparameter grid for the pipeline.
 
@@ -378,6 +383,10 @@ def select_param_grid(mode: str):
         Hyperparameter search space to use.
         One of {"linear", "rbf", "both"}.
 
+    include_pca : bool
+        Whether to include PCA in the pipeline.
+        Use for full band model.
+
     Returns
     -------
 
@@ -394,37 +403,44 @@ def select_param_grid(mode: str):
         raise ValueError(f"""Invalid hyperparameter search space : "{mode}". \n Choose from "linear", "rbf", or "both".""")
 
     if mode == "linear":
-        return [
+        param_grid = [
             {
-                "pca__n_components": [16, 24, 32],
+                # "pca__n_components": [16, 24, 32],
                 "svm__kernel": ["linear"],
                 "svm__C": [0.001, 0.01, 0.1, 1],
             },
         ]
-    if mode == "rbf":
-        return [
+    elif mode == "rbf":
+        param_grid = [
             {
-                "pca__n_components": [16, 24, 32],
+                # "pca__n_components": [16, 24, 32],
                 "svm__kernel": ["rbf"],
                 "svm__C": [0.001, 0.01, 0.1, 1],
                 "svm__gamma": ["scale", "auto"],
             },
         ]
     else:
-        return [
+        param_grid = [
             # Linear kernel does not require gamma
             {
-                "pca__n_components": [16, 24, 32],
+                # "pca__n_components": [16, 24, 32],
                 "svm__kernel": ["linear"],
                 "svm__C": [0.001, 0.01, 0.1, 1],
             },
             {
-                "pca__n_components": [16, 24, 32],
+                # "pca__n_components": [16, 24, 32],
                 "svm__kernel": ["rbf"],
                 "svm__C": [0.001, 0.01, 0.1, 1],
                 "svm__gamma": ["scale", "auto"],
             },
         ]
+
+    if include_pca:
+        # Add PCA n_components to parameter grids
+        for grid in param_grid:
+            grid["pca__n_components"] = [8, 16, 24]
+
+    return param_grid
     
 def train(data_file: Path, model_file: Path) -> None:
     """
@@ -447,7 +463,7 @@ def train(data_file: Path, model_file: Path) -> None:
     data_file : pathlib.Path
         Path to the tempo training data joblib file.
         The file must contain a dictionary with keys:
-            "features" : 2D numpy array of shape (n_samples, 64 * time_frames)
+            "features" : 2D numpy array of shape (n_samples, n_channels * time_frames)
                          Each row is a flattened filterbank feature matrix.
 
             "target"   : 1D numpy array of shape (n_samples,)
@@ -498,19 +514,23 @@ def train(data_file: Path, model_file: Path) -> None:
         (0, 64),
     ]
 
-    param_grid = select_param_grid(SEARCH_SPACE)
-
     estimators = []
     scores = []
+    include_pca = False
     
     # Train one model per band, total 5 models
     time_start = time.time()
     for idx, (start_ch, end_ch) in enumerate(bands, start=1):
 
-        logger.info("Training model %d/5 | channels %d–%d", idx, start_ch, end_ch - 1)
+        logger.info("Training model %d/5 | channels %d-%d", idx, start_ch, end_ch - 1)
+
+        # Include PCA only for the full band model
+        if idx == 5:
+            include_pca = True
 
         # Create pipeline
-        pipeline = create_pipeline(start_ch, end_ch)
+        pipeline = create_pipeline(start_ch, end_ch, include_pca=include_pca)
+        param_grid = select_param_grid(SEARCH_SPACE, include_pca=include_pca)
 
         # Initialize HalvingGridSearchCV
         grid_search = HalvingGridSearchCV(
@@ -520,7 +540,7 @@ def train(data_file: Path, model_file: Path) -> None:
             cv=5,
             scoring="accuracy",
             n_jobs=-1,
-            verbose=0,
+            verbose=3,
         )
 
         # Train the model
