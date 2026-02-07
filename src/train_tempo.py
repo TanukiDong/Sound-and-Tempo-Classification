@@ -87,10 +87,11 @@ from sklearn.ensemble import VotingClassifier
 from sklearn.experimental import enable_halving_search_cv
 from sklearn.model_selection import HalvingGridSearchCV
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import FunctionTransformer, MinMaxScaler, RobustScaler, StandardScaler
+from sklearn.preprocessing import FunctionTransformer
 from sklearn.svm import SVC
 
-from utils import avg_abs_frame_diff
+from utils import (augment_data, avg_abs_frame_diff, select_scaler,
+                   select_weight)
 
 # Set up logging
 logging.basicConfig(
@@ -112,191 +113,6 @@ SCALER = cfg["scaler"]
 SEARCH_SPACE = cfg["search_space"]
 AUGMENT = cfg["augmentation"]
 WEIGHT = cfg["voting_weight"]
-
-def augment_data(X: np.ndarray, y: np.ndarray, mode: str) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Apply data augmentation to the training data.
-
-    Parameters
-    ----------
-
-    X : np.ndarray, shape (n_samples, n_features)
-        2D numpy array of flattened filterbank features
-    
-    y : np.ndarray, shape (n_samples,)
-        1D numpy array of target class labels.
-    
-    mode : str
-        Augmentation technique to use.
-        One of {"none", "noise", "gain", "noise_gain", "mask"}.
-        - none       : No augmentation
-        - noise      : Gaussian noise of 10% of standard deviation
-        - gain       : Random gain of ±10%
-        - noise_gain : Both noise and gain
-        - mask       : Time and frequency masking with maximum of 10% of features
-    
-    Returns
-    -------
-
-    X_aug : np.ndarray, shape (n_samples, n_features) or (2 * n_samples, n_features)
-        Augmented filterbank feature matrix.
-    
-    y_aug : np.ndarray, shape (n_samples,) or (2 * n_samples,)
-        Target label of augmented data.
-
-    Raises
-    ------
-
-    ValueError
-        If "mode" is not a valid augmentation technique.
-    """
-
-    mode = mode.lower()
-
-    if mode not in {"none", "noise", "gain", "noise_gain", "mask"}:
-        raise ValueError(f"""Invalid augmentation mode: {mode}. \n Choose from "none", "noise", "gain", "noise_gain", "mask".""")
-    
-    if mode == "none":
-        return X, y
-    
-    # Random Generator
-    rng = np.random.default_rng(SEED)
-
-    # Reshape X to (n_samples, N_CHANNELS, N_FRAMES)
-    n_samples = X.shape[0]
-    X_aug = X.reshape(n_samples, N_CHANNELS, -1).copy()
-    
-    for i in range(n_samples):
-        
-        # x = original sample
-        x = X_aug[i]
-
-        if mode in {"gain", "noise_gain"}:
-            # ± 10% gain
-            gain = rng.uniform(0.9, 1.1)
-            x = x * gain
-        
-        elif mode in {"noise", "noise_gain"}:
-            # 10% of standard deviation
-            noise_std = np.std(x) * 0.1
-            noise = rng.normal(0, noise_std, x.shape)
-            x = x + noise
-
-        else:
-            # Time mask
-            # 1 ~ 10 = max 10% of 101 frames
-            t_range = rng.integers(1, 11)
-            t_start = rng.integers(0, x.shape[1] - t_range)
-            x[:, t_start:t_start + t_range] = 0
-
-            # Frequency mask
-            # 1 ~ 6 = max 10% of 64 channels
-            f_range = rng.integers(1, 7)
-            f_start = rng.integers(0, x.shape[0] - f_range)
-            x[f_start:f_start + f_range, :] = 0
-
-        # Replace with augmented sample
-        X_aug[i] = x
-
-    # Flatten back to (n_samples, n_features)
-    X_aug = X_aug.reshape(n_samples, -1)
-
-    # Combine original and augmented data
-    X_final = np.concatenate([X, X_aug], axis=0)
-    y_final = np.concatenate([y, y], axis=0)
-
-    return X_final, y_final
-
-def select_scaler(mode: str):
-    """
-    Select a scaler for the pipeline.
-
-    Parameters
-    ----------
-
-    mode : str
-        Scaler type to use.
-        One of {"standard", "minmax", "robust"}.
-        - standard : StandardScaler
-        - minmax   : MinMaxScaler
-        - robust   : RobustScaler
-
-    Returns
-    -------
-
-    scaler : object
-        Scaler object corresponding to the selected mode.
-
-    Raises
-    ------
-
-    ValueError
-        If "mode" is not a valid scaler type.
-    """
-    if mode not in {"standard", "minmax", "robust"}:
-        raise ValueError(f"""Invalid scaler selection : "{mode}". \n Choose from "standard", "minmax", or "robust".""")
-
-    if mode == "standard":
-        return StandardScaler()
-    elif mode == "minmax":
-        return MinMaxScaler()
-    else:
-        return RobustScaler()
-
-def select_weight(scores, mode: str) -> list[float]:
-    """
-    Calculate ensemble weights for the VotingClassifier.
-
-    Parameters
-    ----------
-
-    scores : np.ndarray, shape (n_classifiers,)
-        Cross-validation accuracy scores of each classifier.
-
-    mode : str
-        Weighting strategy to use.
-        One of {"equal", "accuracy", "fullband", "rank"}.
-        - equal      : Equal weights
-        - accuracy   : Weights based on CV accuracy
-        - fullband   : Full band gets higher weight
-        - rank       : Emphasize/penalize according to rank
-
-    Returns
-    -------
-
-    weights : List[float]
-        Weight list corresponding to the selected strategy.
-
-    Raises
-    ------
-
-    ValueError
-        If "mode" is not a valid weighting strategy.
-    """
-    if mode not in {"equal", "accuracy", "fullband", "rank"}:
-        raise ValueError(f"""Invalid weighting strategy : "{mode}". \n Choose from "equal", "accuracy", "fullband", or "rank".""")
-
-    if mode == "equal":
-        # Equal weights
-        weights = np.ones_like(scores) / len(scores)
-
-    elif mode == "accuracy":
-        # Weights based on CV accuracy
-        weights = scores / sum(scores)
-
-    elif mode == "fullband":
-        # Give the full band 1.5x weight
-        scores[-1] *= 1.5
-        weights = scores / sum(scores)
-
-    else:
-        # Emphasize with higher weight and penalize with lower weight according to cv accuracy
-        order = np.argsort(scores)
-        multiplier = np.array([0.8, 0.9, 1.0, 1.1, 1.2])
-        scores[order] *= multiplier
-        weights = scores / sum(scores)
-
-    return list(weights)
 
 def create_pipeline(start_ch: int, end_ch: int, include_pca: bool) -> Pipeline:
     """
@@ -351,7 +167,7 @@ def create_pipeline(start_ch: int, end_ch: int, include_pca: bool) -> Pipeline:
             # 1. Select columns for the band
             ("band", select_band),
             # 2. Calculate change-rate features
-            ("change_rate", FunctionTransformer(avg_abs_frame_diff, kw_args={"n_frames": N_FRAMES})),
+            ("change_rate", FunctionTransformer(avg_abs_frame_diff, kw_args={"n_frames": N_FRAMES}, validate=False)),
             # 3. Scaler
             ("scaler", scaler),
         ]
@@ -361,7 +177,7 @@ def create_pipeline(start_ch: int, end_ch: int, include_pca: bool) -> Pipeline:
         steps.append(("pca", PCA(random_state=SEED)))
 
     # 5. SVM classifier
-    steps.append(("svm",SVC(probability=True,random_state=SEED,)))
+    steps.append(("svm",SVC(probability=True,random_state=SEED)))
     
     return Pipeline(steps)
 
@@ -501,7 +317,7 @@ def train(data_file: Path, model_file: Path) -> None:
     # Target
     y = train_data.get("target")
     # Augment data
-    X, y = augment_data(X, y, AUGMENT)
+    X, y = augment_data(X, y, AUGMENT, N_CHANNELS, N_FRAMES, SEED)
 
     # Different bands for each model
     # 4 sub-bands of 16 channels
@@ -540,7 +356,7 @@ def train(data_file: Path, model_file: Path) -> None:
             cv=5,
             scoring="accuracy",
             n_jobs=-1,
-            verbose=3,
+            verbose=0,
         )
 
         # Train the model
