@@ -81,7 +81,7 @@ The data has been preprocessed from raw signal into filterbank features by the c
 
 Example of filterbank feature compared to its original raw signal.
 
-![Data Signal and FBank comparison](https://github.com/TanukiDong/Sound-and-Tempo-Classification/images/data.jpg)
+![Data Signal and FBank comparison](https://github.com/TanukiDong/Sound-and-Tempo-Classification/blob/main/images/data.jpg)
 
 The data files can be downloaded using `src/download_data.py`, and the data will be stored in `data/`.
 
