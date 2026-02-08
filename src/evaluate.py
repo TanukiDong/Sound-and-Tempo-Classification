@@ -1,4 +1,9 @@
-"""Evaluate a model on the dataset.
+"""
+Note :  This script is provided by the course instructors.
+        I do not claim any ownership over it.
+        It is provided for educational purposes only.
+
+Evaluate a model on the dataset.
 
 
 Usage:
