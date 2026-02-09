@@ -1,0 +1,36 @@
+name: Run Evaluate Scripts
+
+run-name: Evaluate speed and tempo model against test set
+
+on: [push]
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download test dataset
+        run: |
+          uv run src/download_data.py --test
+
+      - name: Evaluate speed model
+        run: |
+          uv run src/evaluate.py \
+            src \
+            models/model.speed.joblib \
+            data/speed.test.joblib
+
+      - name: Evaluate tempo model
+        run: |
+          uv run src/evaluate.py \
+            src \
+            models/model.tempo.joblib \
+            data/tempo.test.joblib
