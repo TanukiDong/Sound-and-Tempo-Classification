@@ -14,11 +14,10 @@ Usage:
 
 import argparse
 import importlib
+import joblib
 import os
 import sys
-
-import joblib
-
+from pathlib import Path
 
 def import_custom_models_for_transform(src_dir: str, transform: str) -> None:
     """Dynamically import all symbols from train_speed or train_tempo."""
@@ -86,10 +85,15 @@ def evaluate(
             y_test,
             y_pred,
             normalize="true",
-            cmap="Blues",
+            cmap="Purples",
             display_labels=(["very slow", "slow", "normal", "fast", "very fast"]),
         )
         disp.ax_.set_title("Confusion Matrix")
+
+        output_dir = Path(model_file).parent / "images"
+        output_dir.mkdir(exist_ok=True)
+        output_path = output_dir / f"{Path(model_file).stem}_confusion_matrix.png"
+        plt.savefig(output_path)
 
         plt.show()
 
