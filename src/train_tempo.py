@@ -373,6 +373,9 @@ def train(data_file: Path, model_file: Path) -> None:
         logger.info(f"Best CV accuracy: {grid_search.best_score_}")
         logger.info(f"Training time: {time_end_1 - time_start_1:.2f} seconds")
 
+    # Report average CV score across the 5 models
+    logger.info(f"Average CV accuracy across all models: {np.mean(scores):.4f}")
+
     # Convert to numpy array
     scores = np.array(scores, dtype=float)
 
