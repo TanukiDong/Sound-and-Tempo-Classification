@@ -19,18 +19,18 @@ jobs:
 
       - name: Download test dataset
         run: |
-          uv run src/download_data.py --test
+          python src/download_data.py --test
 
       - name: Evaluate speed model
         run: |
-          uv run src/evaluate.py \
+          python src/evaluate.py \
             src \
             models/model.speed.joblib \
             data/speed.test.joblib
 
       - name: Evaluate tempo model
         run: |
-          uv run src/evaluate.py \
+          python src/evaluate.py \
             src \
             models/model.tempo.joblib \
             data/tempo.test.joblib
