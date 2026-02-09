@@ -17,9 +17,11 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Download test dataset
+      - name: Download test datasets
         run: |
-          python src/download_data.py --test
+          mkdir -p data
+          wget -O data/speed.test.joblib  "https://drive.google.com/uc?export=download&id=1l5l69jijX6ReH5bHNHdsMHSu52Y2l1KZ"
+          wget -O data/tempo.test.joblib  "https://drive.google.com/uc?export=download&id=1SX5W-mI8ok5_8AXpUNAEDKiDLhrKrNJy"
 
       - name: Evaluate speed model
         run: |
