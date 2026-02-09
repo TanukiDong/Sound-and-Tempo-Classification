@@ -1,3 +1,5 @@
+[![Run Evaluate Scripts](https://github.com/TanukiDong/Sound-and-Tempo-Classification/actions/workflows/run-scripts.yaml/badge.svg)](https://github.com/TanukiDong/Sound-and-Tempo-Classification/actions/workflows/run-scripts.yaml)
+
 # Sound and Tempo Classification - COM6018 Data Science with Python
 
 A coursework project on developing machine learning systems for detecting and classifying temporal modifications in speech recordings.
