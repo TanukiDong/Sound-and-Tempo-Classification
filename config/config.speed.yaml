@@ -27,10 +27,3 @@ include_pca: false
 # 4. noise_gain : Both noise and gain
 # 5. mask       : Masking only
 augmentation: none
-
-# Select weighting strategy for the VotingClassifier
-# 1. equal      : Equal weights
-# 2. accuracy   : Weights based on CV accuracy
-# 3. fullband   : Full band gets higher weight
-# 4. rank       : Emphasize/penalize according to rank
-voting_weight: accuracy
